@@ -505,7 +505,9 @@ func (c *ClientConn) mainLoop(ctx context.Context, logger *zap.Logger) {
 		default:
 			var messageType uint8
 			if err := binary.Read(c.conn, binary.BigEndian, &messageType); err != nil {
-				logger.Error("failed to read message type from VNC client", zap.Error(err))
+				if !errors.Is(err, io.EOF) {
+					logger.Error("failed to read message type from VNC client", zap.Error(err))
+				}
 				return
 			}
 

@@ -106,13 +106,11 @@ func (r *Recorder) writeStartSession(initMsg *common.ServerInit) error {
 
 func (r *Recorder) Consume(data *common.RfbSegment) error {
 	//using async writes so if chan buffer overflows, proxy will not be affected
-	go func() {
-		select {
-		case r.segmentChan <- data:
-			// default:
-			// 	logger.Error("error: recorder queue is full")
-		}
-	}()
+	select {
+	case r.segmentChan <- data:
+		// default:
+		// 	logger.Error("error: recorder queue is full")
+	}
 
 	return nil
 }
