@@ -502,25 +502,25 @@ func (c *ClientConn) mainLoop(ctx context.Context, logger *zap.Logger) {
 			if err := ctx.Err(); err != nil && !errors.Is(err, context.Canceled) {
 				logger.Error("context error", zap.Error(err))
 			}
-			break
+			return
 		default:
 			var messageType uint8
 			if err := binary.Read(c.conn, binary.BigEndian, &messageType); err != nil {
 				logger.Error("failed to read message type from VNC client", zap.Error(err))
-				break
+				return
 			}
 
 			msg, ok := typeMap[messageType]
 			if !ok {
-				logger.Error("bad message type", zap.Uint8("message_type", messageType))
-				break
+				// logger.Error("bad message type", zap.Uint8("message_type", messageType))
+				return
 			}
 
 			reader.SendMessageStart(common.ServerMessageType(messageType))
 			reader.PublishBytes([]byte{byte(messageType)})
 			if _, err := msg.Read(c, reader); err != nil {
 				logger.Error("error parsing message", zap.Error(err))
-				break
+				return
 			}
 		}
 	}
