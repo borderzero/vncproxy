@@ -45,7 +45,7 @@ func NewRecorder(saveFilePath string) (*Recorder, error) {
 	}
 
 	//buffer the channel so we don't halt the proxying flow for slow writes when under pressure
-	rec.segmentChan = make(chan *common.RfbSegment, 100)
+	rec.segmentChan = make(chan *common.RfbSegment, 1000)
 	go func() {
 		for {
 			data := <-rec.segmentChan
@@ -106,11 +106,13 @@ func (r *Recorder) writeStartSession(initMsg *common.ServerInit) error {
 
 func (r *Recorder) Consume(data *common.RfbSegment) error {
 	//using async writes so if chan buffer overflows, proxy will not be affected
-	select {
-	case r.segmentChan <- data:
-		// default:
-		// 	logger.Error("error: recorder queue is full")
-	}
+	go func() {
+		select {
+		case r.segmentChan <- data:
+			// default:
+			// 	logger.Error("error: recorder queue is full")
+		}
+	}()
 
 	return nil
 }

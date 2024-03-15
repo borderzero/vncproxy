@@ -56,7 +56,7 @@ type ClientConn struct {
 	// SetPixelFormat method.
 	PixelFormat common.PixelFormat
 
-	Listeners *common.BestEffortMultiListener
+	Listeners *common.MultiListener
 }
 
 // A ClientConfig structure is used to configure a ClientConn. After
@@ -81,7 +81,7 @@ func NewClientConn(c net.Conn, cfg *ClientConfig, encodings ...common.IEncoding)
 	conn := &ClientConn{
 		conn:      c,
 		config:    cfg,
-		Listeners: &common.BestEffortMultiListener{},
+		Listeners: &common.MultiListener{},
 		Encs:      encodings,
 	}
 	return conn, nil

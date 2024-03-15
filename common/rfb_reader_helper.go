@@ -58,12 +58,12 @@ type SegmentConsumer interface {
 
 type RfbReadHelper struct {
 	io.Reader
-	Listeners  *BestEffortMultiListener
+	Listeners  *MultiListener
 	savedBytes *bytes.Buffer
 }
 
 func NewRfbReadHelper(r io.Reader) *RfbReadHelper {
-	return &RfbReadHelper{Reader: r, Listeners: &BestEffortMultiListener{}}
+	return &RfbReadHelper{Reader: r, Listeners: &MultiListener{}}
 }
 
 func (r *RfbReadHelper) StartByteCollection() {
