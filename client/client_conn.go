@@ -2,13 +2,16 @@ package client
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
-	"github.com/amitbet/vncproxy/common"
-	"github.com/amitbet/vncproxy/logger"
 	"io"
 	"net"
 	"unicode"
+
+	"github.com/borderzero/vncproxy/common"
+	"go.uber.org/zap"
 )
 
 // A ServerMessage implements a message sent from the server to the client.
@@ -74,24 +77,24 @@ type ClientConfig struct {
 	ServerMessages []common.ServerMessage
 }
 
-func NewClientConn(c net.Conn, cfg *ClientConfig) (*ClientConn, error) {
+func NewClientConn(c net.Conn, cfg *ClientConfig, encodings ...common.IEncoding) (*ClientConn, error) {
 	conn := &ClientConn{
 		conn:      c,
 		config:    cfg,
 		Listeners: &common.MultiListener{},
+		Encs:      encodings,
 	}
 	return conn, nil
 }
 
-func (conn *ClientConn) Connect() error {
+func (conn *ClientConn) Connect(ctx context.Context, logger *zap.Logger) error {
 
 	if err := conn.handshake(); err != nil {
-		logger.Errorf("ClientConn.Connect error: %v", err)
 		conn.Close()
-		return err
+		return fmt.Errorf("handshake failed: %v", err)
 	}
 
-	go conn.mainLoop()
+	go conn.mainLoop(ctx, logger)
 
 	return nil
 }
@@ -462,7 +465,7 @@ FindAuth:
 
 // mainLoop reads messages sent from the server and routes them to the
 // proper channels for users of the client to read.
-func (c *ClientConn) mainLoop() {
+func (c *ClientConn) mainLoop(ctx context.Context, logger *zap.Logger) {
 	defer c.Close()
 
 	reader := &common.RfbReadHelper{Reader: c.conn, Listeners: c.Listeners}
@@ -488,35 +491,38 @@ func (c *ClientConn) mainLoop() {
 	}
 
 	defer func() {
-		logger.Warn("ClientConn.MainLoop: exiting!")
 		c.Listeners.Consume(&common.RfbSegment{
 			SegmentType: common.SegmentConnectionClosed,
 		})
 	}()
 
 	for {
-		var messageType uint8
-		if err := binary.Read(c.conn, binary.BigEndian, &messageType); err != nil {
-			logger.Errorf("ClientConn.MainLoop: error reading messagetype, %s", err)
+		select {
+		case <-ctx.Done():
+			if err := ctx.Err(); err != nil && !errors.Is(err, context.Canceled) {
+				logger.Error("context error", zap.Error(err))
+			}
 			break
-		}
+		default:
+			var messageType uint8
+			if err := binary.Read(c.conn, binary.BigEndian, &messageType); err != nil {
+				logger.Error("failed to read message type from VNC client", zap.Error(err))
+				break
+			}
 
-		msg, ok := typeMap[messageType]
-		if !ok {
-			logger.Errorf("ClientConn.MainLoop: bad message type, %d", messageType)
-			// Unsupported message type! Bad!
-			break
-		}
-		logger.Debugf("ClientConn.MainLoop: got ServerMessage:%s", common.ServerMessageType(messageType))
-		reader.SendMessageStart(common.ServerMessageType(messageType))
-		reader.PublishBytes([]byte{byte(messageType)})
+			msg, ok := typeMap[messageType]
+			if !ok {
+				logger.Error("bad message type", zap.Uint8("message_type", messageType))
+				break
+			}
 
-		parsedMsg, err := msg.Read(c, reader)
-		if err != nil {
-			logger.Errorf("ClientConn.MainLoop: error parsing message, %s", err)
-			break
+			reader.SendMessageStart(common.ServerMessageType(messageType))
+			reader.PublishBytes([]byte{byte(messageType)})
+			if _, err := msg.Read(c, reader); err != nil {
+				logger.Error("error parsing message", zap.Error(err))
+				break
+			}
 		}
-		logger.Debugf("ClientConn.MainLoop: read & parsed ServerMessage:%d, %s", parsedMsg.Type(), parsedMsg)
 	}
 }
 

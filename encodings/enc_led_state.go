@@ -1,9 +1,10 @@
 package encodings
 
 import (
+	"fmt"
 	"io"
-	"github.com/amitbet/vncproxy/common"
-	"github.com/amitbet/vncproxy/logger"
+
+	"github.com/borderzero/vncproxy/common"
 )
 
 type EncLedStatePseudo struct {
@@ -24,8 +25,7 @@ func (pe *EncLedStatePseudo) Read(pf *common.PixelFormat, rect *common.Rectangle
 	u8, err := r.ReadUint8()
 	pe.LedState = u8
 	if err != nil {
-		logger.Error("error while reading led state: ", err)
-		return pe, err
+		return pe, fmt.Errorf("error while reading led state: %v", err)
 	}
 	return pe, nil
 }

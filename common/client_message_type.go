@@ -6,8 +6,6 @@ import (
 
 type ClientMessageType uint8
 
-//go:generate stringer -type=ClientMessageType
-
 // Client-to-Server message types.
 const (
 	SetPixelFormatMsgType ClientMessageType = iota

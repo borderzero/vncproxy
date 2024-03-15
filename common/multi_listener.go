@@ -10,7 +10,6 @@ func (m *MultiListener) AddListener(listener SegmentConsumer) {
 
 func (m *MultiListener) Consume(seg *RfbSegment) error {
 	for _, li := range m.listeners {
-
 		err := li.Consume(seg)
 		if err != nil {
 			return err

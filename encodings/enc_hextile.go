@@ -1,9 +1,10 @@
 package encodings
 
 import (
+	"fmt"
 	"io"
-	"github.com/amitbet/vncproxy/common"
-	"github.com/amitbet/vncproxy/logger"
+
+	"github.com/borderzero/vncproxy/common"
 )
 
 const (
@@ -47,10 +48,8 @@ func (z *HextileEncoding) Read(pixelFmt *common.PixelFormat, rect *common.Rectan
 
 			//handle Hextile Subrect(tx, ty, tw, th):
 			subencoding, err := r.ReadUint8()
-
 			if err != nil {
-				logger.Errorf("HextileEncoding.Read: error in hextile reader: %v", err)
-				return nil, err
+				return nil, fmt.Errorf("error reading in hextile reader: %v", err)
 			}
 
 			if (subencoding & HextileRaw) != 0 {
@@ -64,7 +63,6 @@ func (z *HextileEncoding) Read(pixelFmt *common.PixelFormat, rect *common.Rectan
 				r.ReadBytes(int(bytesPerPixel))
 			}
 			if (subencoding & HextileAnySubrects) == 0 {
-				//logger.Debug("hextile reader: no Subrects")
 				continue
 			}
 

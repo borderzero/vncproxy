@@ -2,13 +2,12 @@ package client
 
 import (
 	"encoding/binary"
-	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
-	"github.com/amitbet/vncproxy/common"
-	"github.com/amitbet/vncproxy/encodings"
-	"github.com/amitbet/vncproxy/logger"
+
+	"github.com/borderzero/vncproxy/common"
+	"github.com/borderzero/vncproxy/encodings"
 )
 
 // MsgFramebufferUpdate consists of a sequence of rectangles of
@@ -63,11 +62,9 @@ func (fbm *MsgFramebufferUpdate) Read(c common.IClientConn, r *common.RfbReadHel
 	// We must always support the raw encoding
 	rawEnc := new(encodings.RawEncoding)
 	encMap[rawEnc.Type()] = rawEnc
-	logger.Debugf("MsgFramebufferUpdate.Read: numrects= %d", numRects)
 
 	rects := make([]common.Rectangle, numRects)
 	for i := uint16(0); i < numRects; i++ {
-		logger.Debugf("MsgFramebufferUpdate.Read: ###############rect################: %d", i)
 
 		var encodingTypeInt int32
 		r.SendRectSeparator(-1)
@@ -82,15 +79,12 @@ func (fbm *MsgFramebufferUpdate) Read(c common.IClientConn, r *common.RfbReadHel
 
 		for _, val := range data {
 			if err := binary.Read(r, binary.BigEndian, val); err != nil {
-				logger.Errorf("err: %v", err)
 				return nil, err
 			}
 		}
-		jBytes, _ := json.Marshal(data)
 
 		encType := common.EncodingType(encodingTypeInt)
 
-		logger.Debugf("MsgFramebufferUpdate.Read: rect# %d, rect hdr data: enctype=%s, data: %s", i, encType, string(jBytes))
 		enc, supported := encMap[encodingTypeInt]
 		if supported {
 			var err error
@@ -100,14 +94,13 @@ func (fbm *MsgFramebufferUpdate) Read(c common.IClientConn, r *common.RfbReadHel
 			}
 		} else {
 			if strings.Contains(encType.String(), "Pseudo") {
-				rect.Enc = &encodings.PseudoEncoding{encodingTypeInt}
+				rect.Enc = &encodings.PseudoEncoding{Typ: encodingTypeInt}
 
 				//if this is the last rect, break the for loop
 				if rect.Enc.Type() == int32(common.EncLastRectPseudo) {
 					break
 				}
 			} else {
-				logger.Errorf("MsgFramebufferUpdate.Read: unsupported encoding type: %d, %s", encodingTypeInt, encType)
 				return nil, fmt.Errorf("MsgFramebufferUpdate.Read: unsupported encoding type: %d, %s", encodingTypeInt, encType)
 			}
 		}
@@ -132,8 +125,10 @@ func (fbm *MsgSetColorMapEntries) CopyTo(r io.Reader, w io.Writer, c common.ICli
 	reader := common.NewRfbReadHelper(r)
 	writeTo := &WriteTo{w, "MsgSetColorMapEntries.CopyTo"}
 	reader.Listeners.AddListener(writeTo)
-	_, err := fbm.Read(c, reader)
-	return err
+	if _, err := fbm.Read(c, reader); err != nil {
+		return fmt.Errorf("failed to read onto connection: %v", err)
+	}
+	return nil
 }
 func (m *MsgSetColorMapEntries) String() string {
 	return fmt.Sprintf("MsgSetColorMapEntries (type=%d) first:%d colors: %v: ", m.Type(), m.FirstColor, m.Colors)

@@ -2,9 +2,9 @@ package recorder
 
 import (
 	"time"
-	"github.com/amitbet/vncproxy/client"
-	"github.com/amitbet/vncproxy/common"
-	"github.com/amitbet/vncproxy/logger"
+
+	"github.com/borderzero/vncproxy/client"
+	"github.com/borderzero/vncproxy/common"
 )
 
 type RfbRequester struct {
@@ -17,7 +17,6 @@ type RfbRequester struct {
 
 func (p *RfbRequester) Consume(seg *common.RfbSegment) error {
 
-	logger.Debugf("WriteTo.Consume ("+p.Name+"): got segment type=%s", seg.SegmentType)
 	switch seg.SegmentType {
 	case common.SegmentServerInitMessage:
 		serverInitMessage := seg.Message.(*common.ServerInit)

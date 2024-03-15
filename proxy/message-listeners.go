@@ -1,10 +1,12 @@
 package proxy
 
 import (
-	"github.com/amitbet/vncproxy/client"
-	"github.com/amitbet/vncproxy/common"
-	"github.com/amitbet/vncproxy/logger"
-	"github.com/amitbet/vncproxy/server"
+	"errors"
+	"fmt"
+
+	"github.com/borderzero/vncproxy/client"
+	"github.com/borderzero/vncproxy/common"
+	"github.com/borderzero/vncproxy/server"
 )
 
 type ClientUpdater struct {
@@ -13,26 +15,21 @@ type ClientUpdater struct {
 
 // Consume recieves vnc-server-bound messages (Client messages) and updates the server part of the proxy
 func (cc *ClientUpdater) Consume(seg *common.RfbSegment) error {
-	logger.Tracef("ClientUpdater.Consume (vnc-server-bound): got segment type=%s bytes: %v", seg.SegmentType, seg.Bytes)
 	switch seg.SegmentType {
 
 	case common.SegmentFullyParsedClientMessage:
 		clientMsg := seg.Message.(common.ClientMessage)
-		logger.Debugf("ClientUpdater.Consume:(vnc-server-bound) got ClientMessage type=%s", clientMsg.Type())
 		switch clientMsg.Type() {
 
 		case common.SetPixelFormatMsgType:
 			// update pixel format
-			logger.Debugf("ClientUpdater.Consume: updating pixel format")
 			pixFmtMsg := clientMsg.(*server.MsgSetPixelFormat)
 			cc.conn.PixelFormat = pixFmtMsg.PF
 		}
-
-		err := clientMsg.Write(cc.conn)
-		if err != nil {
-			logger.Errorf("ClientUpdater.Consume (vnc-server-bound, SegmentFullyParsedClientMessage): problem writing to port: %s", err)
+		if err := clientMsg.Write(cc.conn); err != nil {
+			return fmt.Errorf("ClientUpdater.Consume (vnc-server-bound, SegmentFullyParsedClientMessage): problem writing to port: %s", err)
 		}
-		return err
+		return nil
 	}
 	return nil
 }
@@ -42,8 +39,6 @@ type ServerUpdater struct {
 }
 
 func (p *ServerUpdater) Consume(seg *common.RfbSegment) error {
-
-	logger.Debugf("WriteTo.Consume (ServerUpdater): got segment type=%s, object type:%d", seg.SegmentType, seg.UpcomingObjectType)
 	switch seg.SegmentType {
 	case common.SegmentMessageStart:
 	case common.SegmentRectSeparator:
@@ -55,23 +50,18 @@ func (p *ServerUpdater) Consume(seg *common.RfbSegment) error {
 		p.conn.SetPixelFormat(&serverInitMessage.PixelFormat)
 
 	case common.SegmentBytes:
-		logger.Debugf("WriteTo.Consume (ServerUpdater SegmentBytes): got bytes len=%d", len(seg.Bytes))
-		_, err := p.conn.Write(seg.Bytes)
-		if err != nil {
-			logger.Errorf("WriteTo.Consume (ServerUpdater SegmentBytes): problem writing to port: %s", err)
+		if _, err := p.conn.Write(seg.Bytes); err != nil {
+			return fmt.Errorf("WriteTo.Consume (ServerUpdater SegmentBytes): problem writing to port: %s", err)
 		}
-		return err
+		return nil
 	case common.SegmentFullyParsedClientMessage:
-
 		clientMsg := seg.Message.(common.ClientMessage)
-		logger.Debugf("WriteTo.Consume (ServerUpdater): got ClientMessage type=%s", clientMsg.Type())
-		err := clientMsg.Write(p.conn)
-		if err != nil {
-			logger.Errorf("WriteTo.Consume (ServerUpdater SegmentFullyParsedClientMessage): problem writing to port: %s", err)
+		if err := clientMsg.Write(p.conn); err != nil {
+			return fmt.Errorf("WriteTo.Consume (ServerUpdater SegmentFullyParsedClientMessage): problem writing to port: %s", err)
 		}
-		return err
+		return nil
 	default:
-		//return errors.New("WriteTo.Consume: undefined RfbSegment type")
+		return errors.New("WriteTo.Consume: undefined RfbSegment type")
 	}
 	return nil
 }

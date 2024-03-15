@@ -7,7 +7,7 @@ import (
 )
 
 // ClientAuthNone is the "none" authentication. See 7.2.1
-type ClientAuthNone byte
+type ClientAuthNone struct{}
 
 func (*ClientAuthNone) SecurityType() uint8 {
 	return 1

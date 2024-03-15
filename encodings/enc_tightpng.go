@@ -3,8 +3,8 @@ package encodings
 import (
 	"fmt"
 	"io"
-	"github.com/amitbet/vncproxy/common"
-	"github.com/amitbet/vncproxy/logger"
+
+	"github.com/borderzero/vncproxy/common"
 )
 
 type TightPngEncoding struct {
@@ -27,20 +27,19 @@ func (t *TightPngEncoding) Read(pixelFmt *common.PixelFormat, rect *common.Recta
 	//var subencoding uint8
 	compctl, err := r.ReadUint8()
 	if err != nil {
-		logger.Errorf("error in handling tight encoding: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("error in handling tight encoding: %v", err)
 	}
-	logger.Debugf("bytesPixel= %d, subencoding= %d", bytesPixel, compctl)
 
 	//move it to position (remove zlib flush commands)
 	compType := compctl >> 4 & 0x0F
 
-	logger.Debugf("afterSHL:%d", compType)
 	switch compType {
 	case TightPNG:
 		len, err := r.ReadCompactLen()
+		if err != nil {
+			return nil, fmt.Errorf("failed to read compact length: %v", err)
+		}
 		_, err = r.ReadBytes(len)
-
 		if err != nil {
 			return t, err
 		}

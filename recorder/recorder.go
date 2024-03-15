@@ -3,11 +3,12 @@ package recorder
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"os"
 	"time"
-	"github.com/amitbet/vncproxy/common"
-	"github.com/amitbet/vncproxy/logger"
-	"github.com/amitbet/vncproxy/server"
+
+	"github.com/borderzero/vncproxy/common"
+	"github.com/borderzero/vncproxy/server"
 )
 
 type Recorder struct {
@@ -28,7 +29,7 @@ func getNowMillisec() int {
 }
 
 func NewRecorder(saveFilePath string) (*Recorder, error) {
-	//delete file if it exists
+	// delete file if it exists
 	if _, err := os.Stat(saveFilePath); err == nil {
 		os.Remove(saveFilePath)
 	}
@@ -40,8 +41,7 @@ func NewRecorder(saveFilePath string) (*Recorder, error) {
 
 	rec.writer, err = os.OpenFile(saveFilePath, os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
-		logger.Errorf("unable to open file: %s, error: %v", saveFilePath, err)
-		return nil, err
+		return nil, fmt.Errorf("unable to open file: %s, error: %v", saveFilePath, err)
 	}
 
 	//buffer the channel so we don't halt the proxying flow for slow writes when under pressure
@@ -67,12 +67,6 @@ const (
 	SecTypeVncAuth = 2
 	SecTypeTight   = 16
 )
-
-// func (r *Recorder) writeHeader() error {
-// 	_, err := r.writer.WriteString("FBS 001.000\n")
-// 	return err
-// 	// df.write("FBS 001.000\n".getBytes());
-// }
 
 func (r *Recorder) writeStartSession(initMsg *common.ServerInit) error {
 	r.sessionStartWritten = true
@@ -124,34 +118,34 @@ func (r *Recorder) Consume(data *common.RfbSegment) error {
 func (r *Recorder) HandleRfbSegment(data *common.RfbSegment) error {
 	defer func() {
 		if r := recover(); r != nil {
-			logger.Error("Recovered in HandleRfbSegment: ", r)
+			// logger.Error("Recovered in HandleRfbSegment: ", r)
 		}
 	}()
 
 	switch data.SegmentType {
 	case common.SegmentMessageStart:
 		if !r.sessionStartWritten {
-			logger.Debugf("Recorder.HandleRfbSegment: writing start session segment: %v", r.serverInitMessage)
+			// logger.Debugf("Recorder.HandleRfbSegment: writing start session segment: %v", r.serverInitMessage)
 			r.writeStartSession(r.serverInitMessage)
 		}
 
 		switch common.ServerMessageType(data.UpcomingObjectType) {
 		case common.FramebufferUpdate:
-			logger.Debugf("Recorder.HandleRfbSegment: saving FramebufferUpdate segment")
+			// logger.Debugf("Recorder.HandleRfbSegment: saving FramebufferUpdate segment")
 			//r.writeToDisk()
 		case common.SetColourMapEntries:
 		case common.Bell:
 		case common.ServerCutText:
 		default:
-			logger.Warn("Recorder.HandleRfbSegment: unknown message type:" + string(data.UpcomingObjectType))
+			// logger.Warn("Recorder.HandleRfbSegment: unknown message type:" + string(data.UpcomingObjectType))
 		}
 	case common.SegmentConnectionClosed:
 		r.writeToDisk()
 	case common.SegmentRectSeparator:
-		logger.Debugf("Recorder.HandleRfbSegment: writing rect")
+		// logger.Debugf("Recorder.HandleRfbSegment: writing rect")
 		//r.writeToDisk()
 	case common.SegmentBytes:
-		logger.Debug("Recorder.HandleRfbSegment: writing bytes, len:", len(data.Bytes))
+		// logger.Debug("Recorder.HandleRfbSegment: writing bytes, len:", len(data.Bytes))
 		if r.buffer.Len()+len(data.Bytes) > r.maxWriteSize-4 {
 			r.writeToDisk()
 		}
@@ -165,7 +159,7 @@ func (r *Recorder) HandleRfbSegment(data *common.RfbSegment) error {
 		switch clientMsg.Type() {
 		case common.SetPixelFormatMsgType:
 			clientMsg := data.Message.(*server.MsgSetPixelFormat)
-			logger.Debugf("Recorder.HandleRfbSegment: client message %v", *clientMsg)
+			// logger.Debugf("Recorder.HandleRfbSegment: client message %v", *clientMsg)
 			r.serverInitMessage.PixelFormat = clientMsg.PF
 		default:
 			//return errors.New("unknown client message type:" + string(data.UpcomingObjectType))

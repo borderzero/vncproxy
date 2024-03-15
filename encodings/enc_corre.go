@@ -2,8 +2,8 @@ package encodings
 
 import (
 	"encoding/binary"
+	"github.com/borderzero/vncproxy/common"
 	"io"
-	"github.com/amitbet/vncproxy/common"
 )
 
 type CoRREEncoding struct {

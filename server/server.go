@@ -1,11 +1,13 @@
 package server
 
 import (
+	"context"
+	"errors"
 	"io"
-	"log"
 	"net"
 
-	"github.com/amitbet/vncproxy/common"
+	"github.com/borderzero/vncproxy/common"
+	"go.uber.org/zap"
 )
 
 var DefaultClientMessages = []common.ClientMessage{
@@ -25,7 +27,7 @@ type FramebufferUpdate struct {
 	Rects   []*common.Rectangle // rectangles
 }
 
-type ServerHandler func(*ServerConfig, *ServerConn) error
+type ServerHandler func(context.Context, *zap.Logger, *ServerConfig, *ServerConn) error
 
 type ServerConfig struct {
 	SecurityHandlers []SecurityHandler
@@ -43,69 +45,52 @@ type ServerConfig struct {
 	NewConnHandler ServerHandler
 }
 
-func wsHandlerFunc(ws io.ReadWriter, cfg *ServerConfig, sessionId string) {
-	err := attachNewServerConn(ws, cfg, sessionId)
-	if err != nil {
-		log.Fatalf("Error attaching new connection. %v", err)
-	}
-}
-
-func WsServe(url string, cfg *ServerConfig) error {
-	server := WsServer{cfg}
-	server.Listen(url, WsHandler(wsHandlerFunc))
-	return nil
-}
-
-func TcpServe(url string, cfg *ServerConfig) error {
-	ln, err := net.Listen("tcp", url)
-	if err != nil {
-		log.Fatalf("Error listen. %v", err)
-	}
-	return NetListenerServe(ln, cfg)
-}
-
-func NetListenerServe(ln net.Listener, cfg *ServerConfig) error {
+func Serve(ctx context.Context, logger *zap.Logger, ln net.Listener, cfg *ServerConfig) error {
 	for {
 		c, err := ln.Accept()
 		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				return nil
+			}
 			return err
 		}
-		go attachNewServerConn(c, cfg, "dummySession")
+		go attachNewServerConn(ctx, logger, c, cfg, "dummySession")
 	}
 }
 
-func attachNewServerConn(c io.ReadWriter, cfg *ServerConfig, sessionId string) error {
-
+func attachNewServerConn(
+	ctx context.Context,
+	logger *zap.Logger,
+	c io.ReadWriter,
+	cfg *ServerConfig,
+	sessionId string,
+) error {
 	conn, err := NewServerConn(c, cfg)
 	if err != nil {
 		return err
 	}
+	defer conn.Close()
 
 	if err := ServerVersionHandler(cfg, conn); err != nil {
-		conn.Close()
 		return err
 	}
 
 	if err := ServerSecurityHandler(cfg, conn); err != nil {
-		conn.Close()
 		return err
 	}
 
 	//run the handler for this new incoming connection from a vnc-client
 	//this is done before the init sequence to allow listening to server-init messages (and maybe even interception in the future)
-	err = cfg.NewConnHandler(cfg, conn)
+	err = cfg.NewConnHandler(ctx, logger, cfg, conn)
 	if err != nil {
-		conn.Close()
 		return err
 	}
 
 	if err := ServerClientInitHandler(cfg, conn); err != nil {
-		conn.Close()
 		return err
 	}
 
 	if err := ServerServerInitHandler(cfg, conn); err != nil {
-		conn.Close()
 		return err
 	}
 
@@ -114,8 +99,5 @@ func attachNewServerConn(c io.ReadWriter, cfg *ServerConfig, sessionId string) e
 		conn.SessionId = "dummySession"
 	}
 
-	//go here will kill ws connections
-	conn.handle()
-
-	return nil
+	return conn.handle()
 }
