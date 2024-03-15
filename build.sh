@@ -20,10 +20,6 @@ if hash upx 2>/dev/null; then
 	UPX=true
 fi
 
-
-
-
-
 OSES=( linux darwin windows )
 ARCHS=(amd64 386 )
 for os in ${OSES[@]}; do
