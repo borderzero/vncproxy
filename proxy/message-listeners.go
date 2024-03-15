@@ -3,6 +3,7 @@ package proxy
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net"
 
 	"github.com/borderzero/vncproxy/client"
@@ -53,7 +54,7 @@ func (p *ServerUpdater) Consume(seg *common.RfbSegment) error {
 	case common.SegmentBytes:
 		if _, err := p.conn.Write(seg.Bytes); err != nil {
 			// this connection is closed, just return
-			if errors.Is(err, net.ErrClosed) {
+			if errors.Is(err, net.ErrClosed) || errors.Is(err, io.EOF) {
 				return nil
 			}
 			return fmt.Errorf("WriteTo.Consume (ServerUpdater SegmentBytes): problem writing to port: %s", err)

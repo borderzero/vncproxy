@@ -56,7 +56,7 @@ type ClientConn struct {
 	// SetPixelFormat method.
 	PixelFormat common.PixelFormat
 
-	Listeners *common.MultiListener
+	Listeners *common.BestEffortMultiListener
 }
 
 // A ClientConfig structure is used to configure a ClientConn. After
@@ -81,7 +81,7 @@ func NewClientConn(c net.Conn, cfg *ClientConfig, encodings ...common.IEncoding)
 	conn := &ClientConn{
 		conn:      c,
 		config:    cfg,
-		Listeners: &common.MultiListener{},
+		Listeners: &common.BestEffortMultiListener{},
 		Encs:      encodings,
 	}
 	return conn, nil
@@ -149,7 +149,7 @@ func (c *ClientConn) CutText(text string) error {
 
 	for _, char := range text {
 		if char > unicode.MaxLatin1 {
-			return fmt.Errorf("Character '%v' is not valid Latin-1", char)
+			return fmt.Errorf("character '%v' is not valid Latin-1", char)
 		}
 
 		if err := binary.Write(&buf, binary.BigEndian, uint8(char)); err != nil {
@@ -327,7 +327,7 @@ func parseProtocolVersion(pv []byte) (uint, uint, error) {
 
 	l, err := fmt.Sscanf(string(pv), "RFB %d.%d\n", &major, &minor)
 	if l != 2 {
-		return 0, 0, fmt.Errorf("error parsing ProtocolVersion.")
+		return 0, 0, fmt.Errorf("error parsing ProtocolVersion")
 	}
 	if err != nil {
 		return 0, 0, err
@@ -363,12 +363,11 @@ func (c *ClientConn) handshake() error {
 	// 7.1.2 Security Handshake from server
 	var numSecurityTypes uint8
 	if err = binary.Read(c.conn, binary.BigEndian, &numSecurityTypes); err != nil {
-		return fmt.Errorf("Error reading security types: %v", err)
-		return err
+		return fmt.Errorf("error reading security types: %v", err)
 	}
 
 	if numSecurityTypes == 0 {
-		return fmt.Errorf("Error: no security types: %s", c.readErrorReason())
+		return fmt.Errorf("error: no security types: %s", c.readErrorReason())
 	}
 
 	securityTypes := make([]uint8, numSecurityTypes)
